@@ -1,0 +1,2228 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>将棋練習会 自動ペアリング＆記録</title>
+    <meta name="description" content="将棋練習会の参加者選択、Gemini APIによる過去履歴に基づく自動ペアリング、Firebase Firestoreへの結果自動保存を行えるシングルページWebアプリケーション" />
+    <meta property="og:title" content="将棋練習会 自動ペアリング＆記録" />
+    <meta property="og:description" content="将棋練習会の参加者選択、Gemini APIによる過去履歴に基づく自動ペアリング、Firebase Firestoreへの結果自動保存を行えるシングルページWebアプリケーション" />
+    <meta property="og:type" content="website" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=Noto+Serif+JP:wght@600;900&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        --bg-main: #f8fafc;
+        --bg-card: #ffffff;
+        --text-primary: #0f172a;
+        --text-secondary: #475569;
+        --text-muted: #64748b;
+        --border-color: #e2e8f0;
+        --border-focus: #0284c7;
+        --primary: #0f172a;
+        --primary-hover: #1e293b;
+        --accent-amber: #d97706;
+        --accent-amber-light: #fef3c7;
+        --accent-emerald: #059669;
+        --accent-emerald-light: #d1fae5;
+        --accent-blue: #0284c7;
+        --accent-blue-light: #e0f2fe;
+        --danger: #dc2626;
+        --danger-light: #fee2e2;
+        --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+        --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        --radius: 12px;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: 'BIZ UDPGothic', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background-color: var(--bg-main);
+        color: var(--text-primary);
+        line-height: 1.6;
+        padding: 16px;
+        min-height: 100vh;
+      }
+
+      .app-container {
+        max-width: 980px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+
+      /* Header */
+      header.app-header {
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+        color: #ffffff;
+        padding: 24px;
+        border-radius: var(--radius);
+        box-shadow: var(--shadow-md);
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .header-title-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      .title-group {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .koma-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 44px;
+        height: 44px;
+        background: #f59e0b;
+        color: #0f172a;
+        font-family: 'Noto Serif JP', serif;
+        font-size: 24px;
+        font-weight: 900;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      }
+
+      h1.app-title {
+        font-family: 'Noto Serif JP', serif;
+        font-size: 1.5rem;
+        font-weight: 900;
+        letter-spacing: 0.02em;
+        line-height: 1.2;
+      }
+
+      .header-desc {
+        color: #94a3b8;
+        font-size: 0.875rem;
+      }
+
+      .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.75rem;
+        padding: 4px 10px;
+        border-radius: 9999px;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        color: #e2e8f0;
+      }
+
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background-color: #94a3b8;
+      }
+
+      .status-dot.active {
+        background-color: #10b981;
+        box-shadow: 0 0 8px #10b981;
+      }
+
+      .status-dot.warning {
+        background-color: #f59e0b;
+      }
+
+      .btn-ghost-header {
+        background: rgba(255, 255, 255, 0.12);
+        color: #ffffff;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        padding: 6px 12px;
+        border-radius: 8px;
+        font-size: 0.8125rem;
+        font-weight: 600;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.15s ease;
+      }
+
+      .btn-ghost-header:hover {
+        background: rgba(255, 255, 255, 0.22);
+      }
+
+      /* Alert banners */
+      .alert-banner {
+        padding: 12px 16px;
+        border-radius: var(--radius);
+        font-size: 0.875rem;
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        border: 1px solid transparent;
+      }
+
+      .alert-info {
+        background-color: var(--accent-blue-light);
+        color: #0369a1;
+        border-color: #bae6fd;
+      }
+
+      .alert-warning {
+        background-color: var(--accent-amber-light);
+        color: #92400e;
+        border-color: #fde68a;
+      }
+
+      .alert-danger {
+        background-color: var(--danger-light);
+        color: #991b1b;
+        border-color: #fecaca;
+      }
+
+      /* Card components */
+      .card {
+        background-color: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius);
+        padding: 20px;
+        box-shadow: var(--shadow-sm);
+      }
+
+      .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .card-title {
+        font-size: 1.125rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--text-primary);
+      }
+
+      .card-title-icon {
+        color: var(--accent-amber);
+        font-size: 1.25rem;
+      }
+
+      /* Settings Section */
+      #settingsPanel {
+        transition: max-height 0.3s ease, opacity 0.3s ease;
+      }
+
+      #settingsPanel.collapsed {
+        display: none;
+      }
+
+      .settings-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 16px;
+      }
+
+      @media (min-width: 640px) {
+        .settings-grid {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+
+      .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .form-label {
+        font-size: 0.8125rem;
+        font-weight: 700;
+        color: var(--text-secondary);
+        display: flex;
+        justify-content: space-between;
+      }
+
+      .form-label-hint {
+        font-weight: 400;
+        color: var(--text-muted);
+      }
+
+      .form-input-wrap {
+        position: relative;
+        display: flex;
+      }
+
+      .form-input {
+        width: 100%;
+        padding: 10px 12px;
+        font-size: 0.875rem;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        background-color: #ffffff;
+        color: var(--text-primary);
+        font-family: inherit;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+      }
+
+      .form-input:focus {
+        outline: none;
+        border-color: var(--accent-blue);
+        box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
+      }
+
+      .btn-toggle-mask {
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        font-size: 0.875rem;
+        cursor: pointer;
+        padding: 4px 6px;
+        color: var(--text-muted);
+      }
+
+      .settings-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 16px;
+        padding-top: 16px;
+        border-top: 1px solid var(--border-color);
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      /* Participant Zone */
+      .selection-controls {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .btn-sm {
+        padding: 6px 12px;
+        font-size: 0.8125rem;
+        font-weight: 600;
+        border-radius: 6px;
+        border: 1px solid var(--border-color);
+        background-color: #ffffff;
+        color: var(--text-secondary);
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+
+      .btn-sm:hover {
+        background-color: #f1f5f9;
+        color: var(--text-primary);
+      }
+
+      .members-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+        gap: 10px;
+        margin-top: 12px;
+      }
+
+      .member-checkbox-card {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 12px;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        cursor: pointer;
+        background-color: #ffffff;
+        transition: all 0.15s ease;
+        user-select: none;
+      }
+
+      .member-checkbox-card:hover {
+        border-color: #cbd5e1;
+        background-color: #f8fafc;
+      }
+
+      .member-checkbox-card.selected {
+        border-color: #0284c7;
+        background-color: #f0f9ff;
+      }
+
+      .member-checkbox-card input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        accent-color: var(--accent-blue);
+        cursor: pointer;
+      }
+
+      .member-name {
+        font-size: 0.9375rem;
+        font-weight: 700;
+        color: var(--text-primary);
+      }
+
+      .member-add-row {
+        display: flex;
+        gap: 8px;
+        margin-top: 14px;
+        padding-top: 14px;
+        border-top: 1px dashed var(--border-color);
+        align-items: center;
+      }
+
+      .member-add-input {
+        max-width: 200px;
+        padding: 8px 12px;
+        font-size: 0.875rem;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+      }
+
+      .selection-summary {
+        margin-top: 12px;
+        padding: 10px 14px;
+        background-color: #f1f5f9;
+        border-radius: 8px;
+        font-size: 0.875rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .count-tag {
+        font-weight: 700;
+        color: var(--accent-blue);
+      }
+
+      /* Main Action Button */
+      .action-container {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .btn-primary-action {
+        width: 100%;
+        max-width: 480px;
+        background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+        color: #ffffff;
+        border: none;
+        border-radius: 12px;
+        padding: 16px 24px;
+        font-size: 1.125rem;
+        font-weight: 700;
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(180, 83, 9, 0.35);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        transition: transform 0.1s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+      }
+
+      .btn-primary-action:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(180, 83, 9, 0.45);
+      }
+
+      .btn-primary-action:active:not(:disabled) {
+        transform: translateY(0);
+      }
+
+      .btn-primary-action:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        box-shadow: none;
+      }
+
+      /* Progress Indicator */
+      .progress-box {
+        display: none;
+        width: 100%;
+        background-color: #ffffff;
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius);
+        padding: 16px;
+        box-shadow: var(--shadow-sm);
+      }
+
+      .progress-box.active {
+        display: block;
+      }
+
+      .progress-step {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 0.875rem;
+        padding: 8px 0;
+        color: var(--text-muted);
+      }
+
+      .progress-step.current {
+        color: var(--text-primary);
+        font-weight: 700;
+      }
+
+      .progress-step.completed {
+        color: var(--accent-emerald);
+      }
+
+      .spinner {
+        width: 18px;
+        height: 18px;
+        border: 2px solid #e2e8f0;
+        border-top-color: var(--accent-amber);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+
+      /* Recording Status & Action Bar */
+      .record-status-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: #f8fafc;
+        border: 1px solid var(--border-color);
+        padding: 12px 16px;
+        border-radius: 8px;
+        margin-bottom: 14px;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      .btn-record-action {
+        background: linear-gradient(135deg, #059669 0%, #047857 100%);
+        color: #ffffff;
+        border: none;
+        border-radius: 8px;
+        padding: 10px 20px;
+        font-size: 0.9375rem;
+        font-weight: 700;
+        cursor: pointer;
+        box-shadow: 0 2px 8px rgba(5, 150, 105, 0.3);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transition: transform 0.1s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+      }
+
+      .btn-record-action:hover:not(:disabled) {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(5, 150, 105, 0.45);
+      }
+
+      .btn-record-action:active:not(:disabled) {
+        transform: translateY(0);
+      }
+
+      .btn-record-action:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        box-shadow: none;
+        transform: none;
+      }
+
+      .btn-record-action.saved {
+        background: #f1f5f9;
+        color: #475569;
+        border: 1px solid #cbd5e1;
+        cursor: default;
+      }
+
+      /* Results Zone */
+      .results-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 14px;
+        margin-top: 12px;
+      }
+
+      .match-card {
+        background: linear-gradient(to bottom, #ffffff, #fafafa);
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        padding: 16px;
+        box-shadow: var(--shadow-sm);
+        position: relative;
+        overflow: hidden;
+      }
+
+      .match-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 4px;
+        height: 100%;
+        background: var(--accent-amber);
+      }
+
+      .match-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 3px 8px;
+        background-color: #f1f5f9;
+        color: #334155;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        margin-bottom: 10px;
+      }
+
+      .match-players {
+        display: flex;
+        align-items: center;
+        justify-content: space-around;
+        gap: 10px;
+        margin: 8px 0;
+      }
+
+      .player-badge {
+        flex: 1;
+        text-align: center;
+        padding: 8px;
+        background-color: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+      }
+
+      .player-role {
+        font-size: 0.6875rem;
+        color: var(--text-muted);
+        display: block;
+      }
+
+      .player-name-display {
+        font-size: 1.05rem;
+        font-weight: 900;
+        color: var(--text-primary);
+      }
+
+      .vs-tag {
+        font-family: 'Noto Serif JP', serif;
+        font-weight: 900;
+        font-size: 0.9rem;
+        color: var(--accent-amber);
+        padding: 4px;
+      }
+
+      .match-note {
+        margin-top: 8px;
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        background-color: #f8fafc;
+        padding: 4px 8px;
+        border-radius: 4px;
+      }
+
+      /* Bye Card */
+      .bye-card {
+        margin-top: 14px;
+        padding: 14px 18px;
+        background: linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%);
+        border: 1px solid #fde68a;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .bye-info {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .bye-icon {
+        font-size: 1.5rem;
+      }
+
+      .bye-title {
+        font-size: 0.8125rem;
+        font-weight: 700;
+        color: #92400e;
+      }
+
+      .bye-name {
+        font-size: 1.125rem;
+        font-weight: 900;
+        color: #78350f;
+      }
+
+      /* Reasoning Card */
+      .reasoning-box {
+        margin-top: 14px;
+        padding: 16px;
+        background-color: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-left: 4px solid var(--accent-blue);
+        border-radius: 8px;
+        font-size: 0.875rem;
+        color: var(--text-secondary);
+        line-height: 1.6;
+      }
+
+      .reasoning-title {
+        font-size: 0.8125rem;
+        font-weight: 700;
+        color: var(--accent-blue);
+        margin-bottom: 6px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      /* History Zone */
+      .history-table-container {
+        margin-top: 12px;
+        overflow-x: auto;
+      }
+
+      table.history-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.875rem;
+        text-align: left;
+      }
+
+      table.history-table th {
+        background-color: #f1f5f9;
+        color: var(--text-secondary);
+        font-weight: 700;
+        padding: 10px 12px;
+        border-bottom: 2px solid var(--border-color);
+        white-space: nowrap;
+      }
+
+      table.history-table td {
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--border-color);
+      }
+
+      table.history-table tr:hover {
+        background-color: #f8fafc;
+      }
+
+      .history-player-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 4px;
+        background-color: #f1f5f9;
+        font-weight: 700;
+      }
+
+      .tabs-nav {
+        display: flex;
+        gap: 6px;
+        border-bottom: 1px solid var(--border-color);
+        margin-bottom: 12px;
+      }
+
+      .tab-btn {
+        padding: 8px 16px;
+        font-size: 0.875rem;
+        font-weight: 600;
+        background: none;
+        border: none;
+        border-bottom: 2px solid transparent;
+        color: var(--text-muted);
+        cursor: pointer;
+      }
+
+      .tab-btn.active {
+        color: var(--accent-blue);
+        border-bottom-color: var(--accent-blue);
+      }
+
+      .empty-state {
+        text-align: center;
+        padding: 36px 16px;
+        color: var(--text-muted);
+        font-size: 0.875rem;
+      }
+
+      /* Toast Notification */
+      #toast {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background: #0f172a;
+        color: #ffffff;
+        padding: 12px 20px;
+        border-radius: 8px;
+        box-shadow: var(--shadow-lg);
+        font-size: 0.875rem;
+        font-weight: 600;
+        opacity: 0;
+        transform: translateY(20px);
+        transition: opacity 0.2s ease, transform 0.2s ease;
+        z-index: 1000;
+        pointer-events: none;
+      }
+
+      #toast.show {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      /* Mobile Optimizations */
+      @media (max-width: 640px) {
+        body {
+          padding: 8px;
+        }
+        .card {
+          padding: 16px;
+        }
+        .header-title-row {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+        .header-actions {
+          width: 100%;
+          justify-content: space-between;
+        }
+        .members-grid {
+          grid-template-columns: repeat(2, 1fr);
+        }
+        .results-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root" style="display:none"></div>
+    <div class="app-container">
+      
+      <!-- Application Header -->
+      <header class="app-header" id="mainHeader">
+        <div class="header-title-row">
+          <div class="title-group">
+            <span class="koma-badge" title="王将">王</span>
+            <div>
+              <h1 class="app-title">将棋練習会 自動ペアリング＆記録</h1>
+              <p class="header-desc">Gemini AI (2.5 Flash) による過去対戦を考慮した自動ペアリング ＆ Firestore保存</p>
+            </div>
+          </div>
+          <div class="header-actions">
+            <span class="status-pill" id="geminiStatusPill">
+              <span class="status-dot" id="geminiStatusDot"></span>
+              <span id="geminiStatusText">Gemini API: 未設定</span>
+            </span>
+            <span class="status-pill" id="firebaseStatusPill">
+              <span class="status-dot" id="firebaseStatusDot"></span>
+              <span id="firebaseStatusText">Firestore: 未接続</span>
+            </span>
+            <button class="btn-ghost-header" id="btnToggleSettings" type="button">
+              ⚙️ <span>API設定</span>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <!-- API Configuration Panel (Collapsible) -->
+      <section class="card" id="settingsPanel">
+        <div class="card-header">
+          <h2 class="card-title">
+            <span class="card-title-icon">⚙️</span>
+            <span>API 接続設定</span>
+          </h2>
+          <span style="font-size:0.75rem; color:var(--text-muted);">設定値はお使いのブラウザ（LocalStorage）に安全に保存されます</span>
+        </div>
+
+        <div class="alert-banner alert-info" style="margin-bottom: 16px;">
+          <div>
+            <strong>📌 初期設定について:</strong><br>
+            ・<strong>Gemini API Key:</strong> Google AI Studioで取得したAPIキーを入力してください。<br>
+            ・<strong>Firebase:</strong> Firebaseコンソールで作成したWebアプリの「API Key」と「Project ID」を入力してください（Firestoreの `matches` と `byes` コレクションに自動読み書きされます）。<br>
+            <span style="font-size: 0.8125rem; color: #0284c7;">※未接続の場合でも、ブラウザ内ストレージで即座に対戦ペアリングを試すことができます。</span>
+          </div>
+        </div>
+
+        <form id="settingsForm">
+          <div class="settings-grid">
+            <div class="form-group">
+              <label class="form-label" for="inputGeminiApiKey">
+                Gemini API Key
+                <span class="form-label-hint">gemini-2.5-flash 利用</span>
+              </label>
+              <div class="form-input-wrap">
+                <input
+                  type="password"
+                  id="inputGeminiApiKey"
+                  class="form-input"
+                  placeholder="AIzaSy..."
+                  autocomplete="off"
+                />
+                <button type="button" class="btn-toggle-mask" id="btnToggleGeminiMask">表示</button>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="inputFirebaseApiKey">
+                Firebase API Key
+                <span class="form-label-hint">apiKey</span>
+              </label>
+              <div class="form-input-wrap">
+                <input
+                  type="password"
+                  id="inputFirebaseApiKey"
+                  class="form-input"
+                  placeholder="AIzaSy..."
+                  autocomplete="off"
+                />
+                <button type="button" class="btn-toggle-mask" id="btnToggleFirebaseMask">表示</button>
+              </div>
+            </div>
+
+            <div class="form-group" style="grid-column: 1 / -1;">
+              <label class="form-label" for="inputFirebaseProjectId">
+                Firebase Project ID
+                <span class="form-label-hint">projectId (例: shogi-club-12345)</span>
+              </label>
+              <input
+                type="text"
+                id="inputFirebaseProjectId"
+                class="form-input"
+                placeholder="my-shogi-project"
+                autocomplete="off"
+              />
+            </div>
+          </div>
+
+          <div class="settings-footer">
+            <button type="button" class="btn-sm" id="btnResetDefaultKeys">
+              設定をクリア
+            </button>
+            <div style="display:flex; gap:8px;">
+              <button type="button" class="btn-sm" id="btnTestConnection">
+                🔌 接続テスト
+              </button>
+              <button type="submit" class="btn-sm" style="background:var(--accent-blue); color:#fff; border-color:var(--accent-blue);">
+                💾 設定を保存して反映
+              </button>
+            </div>
+          </div>
+        </form>
+      </section>
+
+      <!-- Participant Selection Zone -->
+      <section class="card" id="participantsZone">
+        <div class="card-header">
+          <h2 class="card-title">
+            <span class="card-title-icon">👥</span>
+            <span>本日の参加者選択</span>
+          </h2>
+          <div class="selection-controls">
+            <button class="btn-sm" type="button" id="btnSelectAll">全選択</button>
+            <button class="btn-sm" type="button" id="btnDeselectAll">全解除</button>
+          </div>
+        </div>
+
+        <p style="font-size:0.875rem; color:var(--text-secondary);">
+          本日の練習会に出席しているメンバーにチェックを入れてください。
+        </p>
+
+        <!-- Checkboxes Grid for 8 fixed members -->
+        <div class="members-grid" id="membersGrid">
+          <!-- Populated by JavaScript -->
+        </div>
+
+        <div class="member-add-row">
+          <input
+            type="text"
+            id="newMemberNameInput"
+            class="member-add-input"
+            placeholder="新しい参加者名"
+            maxlength="12"
+          />
+          <button type="button" class="btn-sm" id="btnAddMember">
+            ＋ メンバー追加
+          </button>
+          <span style="font-size:0.75rem; color:var(--text-muted); margin-left:auto;">
+            ※固定8名（田中・山田・佐藤・鈴木・高橋・伊藤・渡辺・小林）
+          </span>
+        </div>
+
+        <div class="selection-summary" id="selectionSummary">
+          <span>出席状況: <span class="count-tag" id="selectedCountText">0名</span> 選択中</span>
+          <span id="matchProjectionText" style="color:var(--text-secondary); font-size:0.8125rem;">
+            （2名以上を選択してください）
+          </span>
+        </div>
+      </section>
+
+      <!-- Main Action Button & Progress Tracker -->
+      <div class="action-container">
+        <button type="button" class="btn-primary-action" id="btnGeneratePairing">
+          <span>☗</span>
+          <span>対戦カードを作成</span>
+        </button>
+
+        <!-- Dynamic step progress box -->
+        <div class="progress-box" id="progressBox">
+          <div class="progress-step" id="step1">
+            <span class="spinner" id="spinStep1"></span>
+            <span class="step-label">① 過去対局（matches）と抜け（byes）の全履歴を取得中...</span>
+          </div>
+          <div class="progress-step" id="step2">
+            <span class="spinner" id="spinStep2" style="display:none"></span>
+            <span class="step-label">② 対戦カードを生成中（データなし・同条件時はランダム抽選）...</span>
+          </div>
+          <div class="progress-step" id="step3">
+            <span class="spinner" id="spinStep3" style="display:none"></span>
+            <span class="step-label">③ 対戦カードが完成しました！</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Results Display Zone -->
+      <section class="card" id="resultsZone" style="display: none;">
+        <div class="card-header">
+          <h2 class="card-title">
+            <span class="card-title-icon">⚔️</span>
+            <span>生成された対戦カード</span>
+          </h2>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button class="btn-sm" type="button" id="btnRecreatePairing">
+              🔄 別の組み合わせを作成
+            </button>
+            <button class="btn-sm" type="button" id="btnCopyResults">
+              📋 テキストでコピー
+            </button>
+          </div>
+        </div>
+
+        <!-- Separate Recording Action Bar -->
+        <div class="record-status-bar" id="recordStatusBar">
+          <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+            <span class="status-pill" id="recordStatusPill" style="background:#fef3c7; color:#92400e; border-color:#fde68a;">
+              <span class="status-dot warning" id="recordStatusDot"></span>
+              <span id="recordStatusLabel">未記録（下書き）</span>
+            </span>
+            <span style="font-size:0.8125rem; color:var(--text-muted);" id="recordHintText">
+              この組み合わせで対局を行う場合は「対戦結果を記録」を押してください。
+            </span>
+          </div>
+          <button type="button" class="btn-record-action" id="btnSaveResults">
+            <span>💾</span>
+            <span id="btnSaveResultsText">対戦結果を記録</span>
+          </button>
+        </div>
+
+        <div id="resultsTimestamp" style="font-size:0.75rem; color:var(--text-muted); margin-bottom:10px;"></div>
+
+        <!-- Matches Cards -->
+        <div class="results-grid" id="matchesContainer">
+          <!-- Filled by JS -->
+        </div>
+
+        <!-- Bye (Rest) Person -->
+        <div class="bye-card" id="byeContainer" style="display: none;">
+          <div class="bye-info">
+            <span class="bye-icon">🍵</span>
+            <div>
+              <div class="bye-title">本日の抜け（お休み / 次回優先対局）</div>
+              <div class="bye-name" id="byePlayerName">-</div>
+            </div>
+          </div>
+          <span style="font-size:0.75rem; color:#92400e; background:rgba(255,255,255,0.7); padding:4px 8px; border-radius:4px;">
+            奇数参加者のため1名休憩
+          </span>
+        </div>
+
+        <!-- AI Reasoning Box -->
+        <div class="reasoning-box" id="reasoningBox">
+          <div class="reasoning-title">
+            <span>💡 対戦決定の理由（Gemini AI 解説）</span>
+          </div>
+          <div id="reasoningContent" style="white-space: pre-wrap;">-</div>
+        </div>
+      </section>
+
+      <!-- Match History Reference Zone -->
+      <section class="card" id="historyZone">
+        <div class="card-header">
+          <h2 class="card-title">
+            <span class="card-title-icon">📜</span>
+            <span>過去の対局履歴</span>
+          </h2>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <button class="btn-sm" type="button" id="btnRefreshHistory">
+              🔄 履歴を更新
+            </button>
+            <button class="btn-sm" type="button" id="btnAddSampleHistory">
+              ＋ サンプル履歴を投入
+            </button>
+          </div>
+        </div>
+
+        <div class="tabs-nav">
+          <button class="tab-btn active" id="tabBtnMatches" type="button">対局履歴 (<span id="matchesCountBadge">0</span>)</button>
+          <button class="tab-btn" id="tabBtnByes" type="button">抜け履歴 (<span id="byesCountBadge">0</span>)</button>
+        </div>
+
+        <!-- Matches History Table -->
+        <div id="tabContentMatches">
+          <div class="history-table-container">
+            <table class="history-table">
+              <thead>
+                <tr>
+                  <th style="width: 160px;">対局日時</th>
+                  <th>対局カード</th>
+                  <th style="width: 90px;">記録先</th>
+                </tr>
+              </thead>
+              <tbody id="matchesTableBody">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+          <div class="empty-state" id="emptyMatchesMessage">
+            対局履歴はまだありません。対戦カード作成後、「対戦結果を記録」を押すと保存されます。
+          </div>
+        </div>
+
+        <!-- Byes History Table -->
+        <div id="tabContentByes" style="display: none;">
+          <div class="history-table-container">
+            <table class="history-table">
+              <thead>
+                <tr>
+                  <th style="width: 160px;">日付</th>
+                  <th>抜け（お休み）</th>
+                  <th style="width: 90px;">記録先</th>
+                </tr>
+              </thead>
+              <tbody id="byesTableBody">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+          <div class="empty-state" id="emptyByesMessage">
+            抜けの履歴はまだありません。
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast"></div>
+
+    <!-- Application Script (ES Module) -->
+    <script type="module">
+      // ==========================================
+      // Default Config & State
+      // ==========================================
+      const DEFAULT_MEMBERS = ['田中', '山田', '佐藤', '鈴木', '高橋', '伊藤', '渡辺', '小林'];
+
+      const state = {
+        members: [],
+        selectedMembers: new Set(),
+        geminiApiKey: '',
+        firebaseApiKey: '',
+        firebaseProjectId: '',
+        firestoreReady: false,
+        cachedMatches: [],
+        cachedByes: [],
+        currentResult: null,
+        isCurrentResultSaved: false,
+        isProcessing: false,
+        isSaving: false
+      };
+
+      // Firebase instance cache
+      let firebaseAppInstance = null;
+      let firestoreDbInstance = null;
+      let firebaseModules = null;
+
+      // ==========================================
+      // Toast notification helper
+      // ==========================================
+      function showToast(message, duration = 3000) {
+        const toast = document.getElementById('toast');
+        toast.textContent = message;
+        toast.classList.add('show');
+        setTimeout(() => {
+          toast.classList.remove('show');
+        }, duration);
+      }
+
+      // ==========================================
+      // Load and Save Local Storage State
+      // ==========================================
+      function loadSettingsFromStorage() {
+        state.geminiApiKey = localStorage.getItem('shogi_gemini_api_key') || '';
+        state.firebaseApiKey = localStorage.getItem('shogi_firebase_api_key') || '';
+        state.firebaseProjectId = localStorage.getItem('shogi_firebase_project_id') || '';
+
+        const savedMembers = localStorage.getItem('shogi_members');
+        if (savedMembers) {
+          try {
+            state.members = JSON.parse(savedMembers);
+          } catch (e) {
+            state.members = [...DEFAULT_MEMBERS];
+          }
+        } else {
+          state.members = [...DEFAULT_MEMBERS];
+        }
+
+        // Initially select all members
+        state.selectedMembers = new Set(state.members);
+
+        // Update settings inputs
+        document.getElementById('inputGeminiApiKey').value = state.geminiApiKey;
+        document.getElementById('inputFirebaseApiKey').value = state.firebaseApiKey;
+        document.getElementById('inputFirebaseProjectId').value = state.firebaseProjectId;
+
+        updateStatusBadges();
+      }
+
+      function saveSettingsToStorage() {
+        state.geminiApiKey = document.getElementById('inputGeminiApiKey').value.trim();
+        state.firebaseApiKey = document.getElementById('inputFirebaseApiKey').value.trim();
+        state.firebaseProjectId = document.getElementById('inputFirebaseProjectId').value.trim();
+
+        localStorage.setItem('shogi_gemini_api_key', state.geminiApiKey);
+        localStorage.setItem('shogi_firebase_api_key', state.firebaseApiKey);
+        localStorage.setItem('shogi_firebase_project_id', state.firebaseProjectId);
+
+        updateStatusBadges();
+        showToast('設定を保存しました');
+      }
+
+      function updateStatusBadges() {
+        const geminiDot = document.getElementById('geminiStatusDot');
+        const geminiText = document.getElementById('geminiStatusText');
+        if (state.geminiApiKey) {
+          geminiDot.className = 'status-dot active';
+          geminiText.textContent = 'Gemini API: 設定済';
+        } else {
+          geminiDot.className = 'status-dot warning';
+          geminiText.textContent = 'Gemini API: 未設定';
+        }
+
+        const fbDot = document.getElementById('firebaseStatusDot');
+        const fbText = document.getElementById('firebaseStatusText');
+        if (state.firebaseApiKey && state.firebaseProjectId) {
+          fbDot.className = 'status-dot active';
+          fbText.textContent = `Firestore: ${state.firebaseProjectId}`;
+        } else {
+          fbDot.className = 'status-dot';
+          fbText.textContent = 'Firestore: 未設定(ローカル)';
+        }
+      }
+
+      // ==========================================
+      // Firebase CDN Loader & Initializer
+      // ==========================================
+      async function getFirestoreService() {
+        if (!state.firebaseApiKey || !state.firebaseProjectId) {
+          return null;
+        }
+
+        if (firestoreDbInstance && firebaseModules) {
+          return { db: firestoreDbInstance, ...firebaseModules };
+        }
+
+        try {
+          // Dynamic import of Firebase SDK via Google CDN
+          const [appMod, firestoreMod] = await Promise.all([
+            import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js'),
+            import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js')
+          ]);
+
+          const firebaseConfig = {
+            apiKey: state.firebaseApiKey,
+            projectId: state.firebaseProjectId,
+            authDomain: `${state.firebaseProjectId}.firebaseapp.com`
+          };
+
+          const apps = appMod.getApps();
+          firebaseAppInstance = apps.length > 0 ? appMod.getApp() : appMod.initializeApp(firebaseConfig);
+          firestoreDbInstance = firestoreMod.getFirestore(firebaseAppInstance);
+          firebaseModules = firestoreMod;
+          state.firestoreReady = true;
+
+          return { db: firestoreDbInstance, ...firebaseModules };
+        } catch (error) {
+          console.error('Firebase initialization error:', error);
+          state.firestoreReady = false;
+          throw error;
+        }
+      }
+
+      // ==========================================
+      // Members UI Management
+      // ==========================================
+      function renderMembers() {
+        const grid = document.getElementById('membersGrid');
+        grid.innerHTML = '';
+
+        state.members.forEach((name) => {
+          const card = document.createElement('label');
+          const isChecked = state.selectedMembers.has(name);
+          card.className = `member-checkbox-card ${isChecked ? 'selected' : ''}`;
+          card.id = `memberCard_${name}`;
+
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.checked = isChecked;
+          checkbox.id = `checkbox_${name}`;
+
+          checkbox.addEventListener('change', () => {
+            if (checkbox.checked) {
+              state.selectedMembers.add(name);
+              card.classList.add('selected');
+            } else {
+              state.selectedMembers.delete(name);
+              card.classList.remove('selected');
+            }
+            updateSelectionSummary();
+          });
+
+          const nameSpan = document.createElement('span');
+          nameSpan.className = 'member-name';
+          nameSpan.textContent = name;
+
+          card.appendChild(checkbox);
+          card.appendChild(nameSpan);
+          grid.appendChild(card);
+        });
+
+        updateSelectionSummary();
+      }
+
+      function updateSelectionSummary() {
+        const count = state.selectedMembers.size;
+        const countEl = document.getElementById('selectedCountText');
+        const projEl = document.getElementById('matchProjectionText');
+        countEl.textContent = `${count}名`;
+
+        if (count < 2) {
+          projEl.textContent = '（※対戦には2名以上の選択が必要です）';
+          projEl.style.color = 'var(--danger)';
+        } else {
+          const matchCount = Math.floor(count / 2);
+          const hasBye = count % 2 !== 0;
+          projEl.textContent = `（${matchCount} 対局${hasBye ? ' ＋ 1名 抜け' : '、抜けなし'}予定）`;
+          projEl.style.color = 'var(--text-secondary)';
+        }
+      }
+
+      // ==========================================
+      // Firestore / Local Data Operations
+      // ==========================================
+      async function fetchAllHistory() {
+        const fb = await getFirestoreService().catch(err => {
+          console.warn('Firestore connect failed, falling back to local:', err);
+          return null;
+        });
+
+        let matches = [];
+        let byes = [];
+
+        if (fb) {
+          try {
+            // Fetch matches from Firestore
+            const matchesCol = fb.collection(fb.db, 'matches');
+            const matchesSnap = await fb.getDocs(matchesCol);
+            matchesSnap.forEach(doc => {
+              matches.push({ id: doc.id, ...doc.data(), source: 'Firestore' });
+            });
+
+            // Fetch byes from Firestore
+            const byesCol = fb.collection(fb.db, 'byes');
+            const byesSnap = await fb.getDocs(byesCol);
+            byesSnap.forEach(doc => {
+              byes.push({ id: doc.id, ...doc.data(), source: 'Firestore' });
+            });
+          } catch (e) {
+            console.error('Error fetching Firestore history:', e);
+            showToast('Firestore履歴の取得でエラーが発生しました。ローカルデータを使用します。');
+            matches = getLocalMatches();
+            byes = getLocalByes();
+          }
+        } else {
+          // Fallback to local storage
+          matches = getLocalMatches();
+          byes = getLocalByes();
+        }
+
+        // Sort by date descending
+        matches.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+        byes.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+
+        state.cachedMatches = matches;
+        state.cachedByes = byes;
+
+        renderHistoryTables();
+        return { matches, byes };
+      }
+
+      function getLocalMatches() {
+        try {
+          return JSON.parse(localStorage.getItem('shogi_local_matches') || '[]');
+        } catch {
+          return [];
+        }
+      }
+
+      function getLocalByes() {
+        try {
+          return JSON.parse(localStorage.getItem('shogi_local_byes') || '[]');
+        } catch {
+          return [];
+        }
+      }
+
+      async function savePairingResults(pairingResult) {
+        const fb = await getFirestoreService().catch(() => null);
+        const isoDate = new Date().toISOString();
+
+        if (fb) {
+          try {
+            // Save matches to Firestore: { date: ISO文字列, player1: "名前", player2: "名前" }
+            const matchesCol = fb.collection(fb.db, 'matches');
+            for (const m of pairingResult.matches) {
+              await fb.addDoc(matchesCol, {
+                date: isoDate,
+                player1: m.player1,
+                player2: m.player2
+              });
+            }
+
+            // Save bye to Firestore: { date: ISO文字列, player: "名前" }
+            if (pairingResult.bye) {
+              const byesCol = fb.collection(fb.db, 'byes');
+              await fb.addDoc(byesCol, {
+                date: isoDate,
+                player: pairingResult.bye
+              });
+            }
+          } catch (e) {
+            console.error('Failed to save to Firestore, saving to local fallback:', e);
+            saveToLocalFallback(pairingResult, isoDate);
+            showToast('Firestore保存エラーのためローカルに保存しました');
+            return;
+          }
+        } else {
+          saveToLocalFallback(pairingResult, isoDate);
+        }
+      }
+
+      function saveToLocalFallback(pairingResult, isoDate) {
+        const localMatches = getLocalMatches();
+        for (const m of pairingResult.matches) {
+          localMatches.unshift({
+            id: 'local_' + Date.now() + Math.random(),
+            date: isoDate,
+            player1: m.player1,
+            player2: m.player2,
+            source: 'Local'
+          });
+        }
+        localStorage.setItem('shogi_local_matches', JSON.stringify(localMatches));
+
+        if (pairingResult.bye) {
+          const localByes = getLocalByes();
+          localByes.unshift({
+            id: 'local_bye_' + Date.now(),
+            date: isoDate,
+            player: pairingResult.bye,
+            source: 'Local'
+          });
+          localStorage.setItem('shogi_local_byes', JSON.stringify(localByes));
+        }
+      }
+
+      function renderHistoryTables() {
+        // Matches Table
+        const matchesBody = document.getElementById('matchesTableBody');
+        const emptyMatches = document.getElementById('emptyMatchesMessage');
+        const matchesBadge = document.getElementById('matchesCountBadge');
+        matchesBadge.textContent = state.cachedMatches.length;
+
+        if (state.cachedMatches.length === 0) {
+          matchesBody.innerHTML = '';
+          emptyMatches.style.display = 'block';
+        } else {
+          emptyMatches.style.display = 'none';
+          matchesBody.innerHTML = state.cachedMatches.map(m => {
+            const dateStr = formatDate(m.date);
+            const sourceBadge = m.source === 'Firestore' 
+              ? `<span style="color:#059669; font-weight:700; font-size:0.75rem;">Firestore</span>`
+              : `<span style="color:#64748b; font-size:0.75rem;">ローカル</span>`;
+            return `
+              <tr>
+                <td style="color:var(--text-muted); font-size:0.8125rem;">${dateStr}</td>
+                <td>
+                  <span class="history-player-badge">${escapeHtml(m.player1)}</span>
+                  <span style="color:var(--accent-amber); font-weight:900; margin: 0 6px;">vs</span>
+                  <span class="history-player-badge">${escapeHtml(m.player2)}</span>
+                </td>
+                <td>${sourceBadge}</td>
+              </tr>
+            `;
+          }).join('');
+        }
+
+        // Byes Table
+        const byesBody = document.getElementById('byesTableBody');
+        const emptyByes = document.getElementById('emptyByesMessage');
+        const byesBadge = document.getElementById('byesCountBadge');
+        byesBadge.textContent = state.cachedByes.length;
+
+        if (state.cachedByes.length === 0) {
+          byesBody.innerHTML = '';
+          emptyByes.style.display = 'block';
+        } else {
+          emptyByes.style.display = 'none';
+          byesBody.innerHTML = state.cachedByes.map(b => {
+            const dateStr = formatDate(b.date);
+            const sourceBadge = b.source === 'Firestore' 
+              ? `<span style="color:#059669; font-weight:700; font-size:0.75rem;">Firestore</span>`
+              : `<span style="color:#64748b; font-size:0.75rem;">ローカル</span>`;
+            return `
+              <tr>
+                <td style="color:var(--text-muted); font-size:0.8125rem;">${dateStr}</td>
+                <td>
+                  <span class="history-player-badge" style="background:#fef3c7; color:#92400e;">
+                    🍵 ${escapeHtml(b.player)}
+                  </span>
+                </td>
+                <td>${sourceBadge}</td>
+              </tr>
+            `;
+          }).join('');
+        }
+      }
+
+      function formatDate(isoStr) {
+        if (!isoStr) return '-';
+        try {
+          const d = new Date(isoStr);
+          if (isNaN(d.getTime())) return isoStr;
+          return `${d.getFullYear()}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getDate().toString().padStart(2, '0')} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+        } catch {
+          return isoStr;
+        }
+      }
+
+      function escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      // ==========================================
+      // Condition Checker & Random Pairing Generator
+      // ==========================================
+      function checkIfNoDataOrSameCondition(attendees, matchesHistory, byesHistory) {
+        // 1. If matches history has no records
+        if (!matchesHistory || matchesHistory.length === 0) {
+          return {
+            isRandomOk: true,
+            reason: '過去の対戦履歴データが存在しないため、公平な無作為抽選（ランダム）により対局組み合わせおよび先手・後手を決定しました。'
+          };
+        }
+
+        const attendeeSet = new Set(attendees);
+        // Matches involving any of the selected attendees
+        const relevantMatches = matchesHistory.filter(m => attendeeSet.has(m.player1) || attendeeSet.has(m.player2));
+        if (relevantMatches.length === 0) {
+          return {
+            isRandomOk: true,
+            reason: '選択された参加者同士の過去対戦データが存在しないため、公平な無作為抽選（ランダム）により対戦カードを決定しました。'
+          };
+        }
+
+        // Check if there are ANY past matches between the selected members
+        let totalGamesBetweenSelected = 0;
+        const pairCounts = new Map();
+        for (let i = 0; i < attendees.length; i++) {
+          for (let j = i + 1; j < attendees.length; j++) {
+            const key = [attendees[i], attendees[j]].sort().join('_vs_');
+            pairCounts.set(key, 0);
+          }
+        }
+
+        for (const m of relevantMatches) {
+          if (attendeeSet.has(m.player1) && attendeeSet.has(m.player2)) {
+            const key = [m.player1, m.player2].sort().join('_vs_');
+            if (pairCounts.has(key)) {
+              pairCounts.set(key, pairCounts.get(key) + 1);
+              totalGamesBetweenSelected++;
+            }
+          }
+        }
+
+        if (totalGamesBetweenSelected === 0) {
+          return {
+            isRandomOk: true,
+            reason: '選択された参加者間の直接対戦履歴がまだないため、公平な無作為抽選（ランダム）により対戦カードを決定しました。'
+          };
+        }
+
+        // Check if all pairs between selected members have played each other the exact same number of times
+        const counts = Array.from(pairCounts.values());
+        const allPairsEqual = counts.every(c => c === counts[0]);
+
+        // Check if all selected members have the exact same number of byes
+        const byeCounts = attendees.map(name => (byesHistory || []).filter(b => b.player === name).length);
+        const allByesEqual = byeCounts.every(b => b === byeCounts[0]);
+
+        if (allPairsEqual && allByesEqual) {
+          return {
+            isRandomOk: true,
+            reason: '参加者全員の対局数・対戦間隔・抜け回数の条件が同一であるため、公平な無作為抽選（ランダム）により対戦カードを決定しました。'
+          };
+        }
+
+        return {
+          isRandomOk: false,
+          reason: ''
+        };
+      }
+
+      function generateRandomPairing(attendees, byesHistory, reasonText) {
+        let pool = [...attendees];
+        let bye = null;
+
+        // If odd, select bye based on least byes, or random if equal
+        if (pool.length % 2 !== 0) {
+          const byeStats = pool.map(name => ({
+            name,
+            count: (byesHistory || []).filter(b => b.player === name).length
+          }));
+          const minCount = Math.min(...byeStats.map(s => s.count));
+          const candidates = byeStats.filter(s => s.count === minCount).map(s => s.name);
+          bye = candidates[Math.floor(Math.random() * candidates.length)];
+          pool = pool.filter(n => n !== bye);
+        }
+
+        // Shuffle remaining using Fisher-Yates
+        for (let i = pool.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [pool[i], pool[j]] = [pool[j], pool[i]];
+        }
+
+        const matches = [];
+        for (let i = 0; i < pool.length; i += 2) {
+          const coin = Math.random() < 0.5;
+          const player1 = coin ? pool[i] : pool[i + 1];
+          const player2 = coin ? pool[i + 1] : pool[i];
+          matches.push({
+            matchNumber: (i / 2) + 1,
+            player1,
+            player2,
+            note: 'ランダム抽選（無作為振り分け）'
+          });
+        }
+
+        return {
+          matches,
+          bye,
+          reasoning: reasonText || 'データがないとき・各メンバーが同条件のときはランダム抽選により対戦カードを決定しました。'
+        };
+      }
+
+      // ==========================================
+      // Gemini API Pairing Engine
+      // ==========================================
+      async function callGeminiPairingAPI(attendees, matchesHistory, byesHistory) {
+        const apiKey = state.geminiApiKey.trim();
+        if (!apiKey) {
+          throw new Error('Gemini API Keyが設定されていません。上部の「API設定」から入力してください。');
+        }
+
+        // Format history for prompt
+        const matchesSummary = matchesHistory.slice(0, 50).map(m => ({
+          date: m.date,
+          player1: m.player1,
+          player2: m.player2
+        }));
+
+        const byesSummary = byesHistory.slice(0, 30).map(b => ({
+          date: b.date,
+          player: b.player
+        }));
+
+        const prompt = `
+あなたは将棋練習会の進行役および対戦カード編成AIです。
+本日の出席者リストと過去の対局履歴・抜け履歴をもとに、最も公平で充実した対局組み合わせ（ペアリング）を決定してください。
+
+【本日の出席者】
+${JSON.stringify(attendees, null, 2)} (合計: ${attendees.length}名)
+
+【過去の対局履歴（新しい順）】
+${JSON.stringify(matchesSummary, null, 2)}
+
+【過去の抜け（お休み）履歴】
+${JSON.stringify(byesSummary, null, 2)}
+
+【対戦組み合わせの厳格ルール】
+1. 1対1の将棋対局です。出席者全員ができる限り同時に開始できるようにペアを組みます。
+2. 【最優先・絶対厳守】前回の対局で当たった相手との再戦は絶対に回避してください。
+3. 【優先】過去の対戦履歴を加味し、「最も対戦が遠ざかっている（または一度も対戦していない）ペア」を最優先でマッチングしてください。
+4. 【重要: データなし・同条件時のランダム選定】過去の対戦履歴データが存在しない場合、または各参加者の対戦間隔・過去対戦回数・抜け回数などの条件が同等である場合は、特定の名前に偏らず、ランダム（無作為抽選）で公平にペアを組み、先手・後手もランダムに割り当ててください。その際の解説（reasoning）には「データ未登録または同条件のため、ランダム抽選により対戦カードを決定」と明記してください。
+5. 【抜けの選定】出席者数が奇数の場合、1名のみを「抜け（お休み）」とします。過去の抜け回数が最も少ない人（または一度も抜けていない人）を優先して抜けに選出してください。出席者数が偶数の場合、抜けは null としてください。
+6. 出席者リストに含まれる人全員を漏れなく、かつ重複なく割り当ててください（1人が2対局に入ることは不可）。
+
+【出力フォーマット】
+必ず以下のJSON形式のみを出力してください（JSON以外の余計なテキストは含めないでください）:
+{
+  "matches": [
+    {
+      "matchNumber": 1,
+      "player1": "名前A",
+      "player2": "名前B",
+      "note": "初対戦ペア、同条件のためランダム選出、または前回対局から〇日経過のため選出、など"
+    }
+  ],
+  "bye": "お休みの人の名前（奇数時のみ。偶数時は null）",
+  "reasoning": "今回のペアリング決定理由の詳しい解説（前回対局の回避状況、対戦頻度の平準化、抜けの選出理由など）"
+}
+`;
+
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
+
+        const payload = {
+          contents: [
+            {
+              parts: [
+                {
+                  text: prompt
+                }
+              ]
+            }
+          ],
+          generationConfig: {
+            responseMimeType: "application/json",
+            temperature: 0.2
+          }
+        };
+
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+          let errDetail = '';
+          try {
+            const errJson = await response.json();
+            errDetail = errJson.error?.message || response.statusText;
+          } catch {
+            errDetail = response.statusText;
+          }
+          throw new Error(`Gemini API エラー (${response.status}): ${errDetail}`);
+        }
+
+        const data = await response.json();
+        const rawJsonText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+        if (!rawJsonText) {
+          throw new Error('Gemini APIからの応答が空でした。再度実行してください。');
+        }
+
+        try {
+          const parsed = JSON.parse(rawJsonText);
+          return parsed;
+        } catch (e) {
+          console.error('Failed to parse Gemini JSON output:', rawJsonText);
+          throw new Error('Geminiからの応答JSONを解析できませんでした: ' + e.message);
+        }
+      }
+
+      // ==========================================
+      // Main Execution Workflow (対戦カード作成)
+      // ==========================================
+      async function executePairingFlow() {
+        const attendees = Array.from(state.selectedMembers);
+        if (attendees.length < 2) {
+          showToast('対戦カードを作成するには最低2名を選択してください');
+          return;
+        }
+
+        const actionBtn = document.getElementById('btnGeneratePairing');
+        const progressBox = document.getElementById('progressBox');
+        const step1 = document.getElementById('step1');
+        const step2 = document.getElementById('step2');
+        const step3 = document.getElementById('step3');
+        const spin1 = document.getElementById('spinStep1');
+        const spin2 = document.getElementById('spinStep2');
+        const spin3 = document.getElementById('spinStep3');
+
+        state.isProcessing = true;
+        actionBtn.disabled = true;
+        progressBox.classList.add('active');
+
+        // Reset step states
+        [step1, step2, step3].forEach(s => s.className = 'progress-step');
+        [spin1, spin2, spin3].forEach(sp => sp.style.display = 'none');
+
+        try {
+          // ----------------------------------------
+          // Step 1: Firestore / Local 履歴取得 & 条件判定
+          // ----------------------------------------
+          step1.className = 'progress-step current';
+          spin1.style.display = 'inline-block';
+          
+          const { matches, byes } = await fetchAllHistory();
+          const conditionCheck = checkIfNoDataOrSameCondition(attendees, matches, byes);
+          
+          spin1.style.display = 'none';
+          step1.className = 'progress-step completed';
+          step1.querySelector('.step-label').textContent = `① 過去履歴確認完了 (${matches.length}件の対局、${byes.length}件の抜け)`;
+
+          // ----------------------------------------
+          // Step 2: 対戦カード生成
+          // (データなしや同条件時はランダム選定、APIキー有無に応じたフォールバック)
+          // ----------------------------------------
+          step2.className = 'progress-step current';
+          spin2.style.display = 'inline-block';
+
+          let result;
+
+          if (conditionCheck.isRandomOk) {
+            // データがないとき、または各メンバーが同条件のとき: ランダムでよい
+            if (state.geminiApiKey) {
+              try {
+                result = await callGeminiPairingAPI(attendees, matches, byes);
+              } catch (apiErr) {
+                console.warn('Gemini API failed, using random pairing fallback:', apiErr);
+                result = generateRandomPairing(attendees, byes, conditionCheck.reason);
+              }
+            } else {
+              // APIキー未設定時も即座にランダムペアリングを生成
+              result = generateRandomPairing(attendees, byes, conditionCheck.reason);
+            }
+          } else {
+            // 過去対戦データに偏り・履歴がある場合
+            if (state.geminiApiKey) {
+              try {
+                result = await callGeminiPairingAPI(attendees, matches, byes);
+              } catch (apiErr) {
+                console.warn('Gemini API call failed, using random pairing fallback:', apiErr);
+                result = generateRandomPairing(attendees, byes, `Gemini API通信エラーのためランダム抽選を適用しました: ${apiErr.message}`);
+              }
+            } else {
+              result = generateRandomPairing(attendees, byes, '過去の対局履歴が存在しますが、Gemini API Keyが未設定のためランダム抽選を適用しました。過去履歴を考慮した最適ペアリングを行うには上部の「API設定」でキーを入力してください。');
+            }
+          }
+
+          spin2.style.display = 'none';
+          step2.className = 'progress-step completed';
+          step2.querySelector('.step-label').textContent = `② 対戦カード生成完了 (${result.matches?.length || 0}対局作成)`;
+
+          // ----------------------------------------
+          // Step 3: 結果表示準備 (記録は別ボタンで行う)
+          // ----------------------------------------
+          step3.className = 'progress-step completed';
+          step3.querySelector('.step-label').textContent = '③ 対戦カードが完成しました！結果エリアの「対戦結果を記録」で保存できます';
+
+          // Set state as unsaved draft
+          state.currentResult = result;
+          state.isCurrentResultSaved = false;
+
+          renderResults(result);
+          updateRecordingUI();
+
+          showToast('対戦カードを作成しました！');
+          document.getElementById('resultsZone').scrollIntoView({ behavior: 'smooth' });
+
+        } catch (err) {
+          console.error('Pairing flow failed:', err);
+          alert('対戦カード作成中にエラーが発生しました:\n' + err.message);
+          showToast('対戦カード作成が中断されました');
+        } finally {
+          state.isProcessing = false;
+          actionBtn.disabled = false;
+        }
+      }
+
+      // ==========================================
+      // Separate Recording Workflow (対戦結果を記録)
+      // ==========================================
+      async function handleRecordCurrentResults() {
+        if (!state.currentResult) {
+          showToast('記録対象の対戦カードがありません');
+          return;
+        }
+
+        if (state.isCurrentResultSaved) {
+          showToast('この対戦カードは既に記録されています');
+          return;
+        }
+
+        if (state.isSaving) return;
+
+        const saveBtn = document.getElementById('btnSaveResults');
+        const saveBtnText = document.getElementById('btnSaveResultsText');
+        state.isSaving = true;
+        saveBtn.disabled = true;
+        saveBtnText.textContent = 'Firestore に記録中...';
+
+        try {
+          await savePairingResults(state.currentResult);
+          state.isCurrentResultSaved = true;
+
+          // Refresh history tables to reflect new records
+          await fetchAllHistory();
+
+          updateRecordingUI();
+          showToast('対戦結果を正常に記録しました！');
+        } catch (err) {
+          console.error('Save failed:', err);
+          alert('対戦結果の記録中にエラーが発生しました:\n' + err.message);
+          saveBtn.disabled = false;
+          saveBtnText.textContent = '対戦結果を記録';
+        } finally {
+          state.isSaving = false;
+        }
+      }
+
+      function updateRecordingUI() {
+        const recordStatusPill = document.getElementById('recordStatusPill');
+        const recordStatusDot = document.getElementById('recordStatusDot');
+        const recordStatusLabel = document.getElementById('recordStatusLabel');
+        const recordHintText = document.getElementById('recordHintText');
+        const saveBtn = document.getElementById('btnSaveResults');
+        const saveBtnText = document.getElementById('btnSaveResultsText');
+
+        if (!saveBtn) return;
+
+        if (state.isCurrentResultSaved) {
+          recordStatusPill.style.background = '#dcfce7';
+          recordStatusPill.style.color = '#15803d';
+          recordStatusPill.style.borderColor = '#bbf7d0';
+          recordStatusDot.className = 'status-dot online';
+          recordStatusLabel.textContent = '記録完了（保存済）';
+          recordHintText.textContent = 'この対戦カードはFirestore（またはローカル）に記録されました。過去履歴テーブルにも反映されています。';
+          saveBtn.disabled = true;
+          saveBtn.classList.add('saved');
+          saveBtnText.textContent = '記録完了 ✅';
+        } else {
+          recordStatusPill.style.background = '#fef3c7';
+          recordStatusPill.style.color = '#92400e';
+          recordStatusPill.style.borderColor = '#fde68a';
+          recordStatusDot.className = 'status-dot warning';
+          recordStatusLabel.textContent = '未記録（下書き）';
+          recordHintText.textContent = 'この組み合わせで対局を行う場合は「対戦結果を記録」を押してください。';
+          saveBtn.disabled = false;
+          saveBtn.classList.remove('saved');
+          saveBtnText.textContent = '対戦結果を記録';
+        }
+      }
+
+      function renderResults(result) {
+        const resultsZone = document.getElementById('resultsZone');
+        const matchesContainer = document.getElementById('matchesContainer');
+        const byeContainer = document.getElementById('byeContainer');
+        const byePlayerName = document.getElementById('byePlayerName');
+        const reasoningContent = document.getElementById('reasoningContent');
+        const resultsTimestamp = document.getElementById('resultsTimestamp');
+
+        resultsZone.style.display = 'block';
+        resultsTimestamp.textContent = `作成日時: ${formatDate(new Date().toISOString())}`;
+
+        // Render Matches
+        matchesContainer.innerHTML = (result.matches || []).map((m, idx) => {
+          return `
+            <div class="match-card">
+              <div class="match-badge">第 ${m.matchNumber || idx + 1} 対局</div>
+              <div class="match-players">
+                <div class="player-badge">
+                  <span class="player-role">先手 ☗</span>
+                  <span class="player-name-display">${escapeHtml(m.player1)}</span>
+                </div>
+                <div class="vs-tag">VS</div>
+                <div class="player-badge">
+                  <span class="player-role">後手 ☖</span>
+                  <span class="player-name-display">${escapeHtml(m.player2)}</span>
+                </div>
+              </div>
+              ${m.note ? `<div class="match-note">💬 ${escapeHtml(m.note)}</div>` : ''}
+            </div>
+          `;
+        }).join('');
+
+        // Render Bye
+        if (result.bye && result.bye !== 'null') {
+          byePlayerName.textContent = result.bye;
+          byeContainer.style.display = 'flex';
+        } else {
+          byeContainer.style.display = 'none';
+        }
+
+        // Render Reasoning
+        reasoningContent.textContent = result.reasoning || '理由の記述はありません。';
+      }
+
+      // ==========================================
+      // Event Listeners Setup
+      // ==========================================
+      function setupEventListeners() {
+        // Toggle Settings Panel
+        const btnToggleSettings = document.getElementById('btnToggleSettings');
+        const settingsPanel = document.getElementById('settingsPanel');
+        btnToggleSettings.addEventListener('click', () => {
+          settingsPanel.classList.toggle('collapsed');
+        });
+
+        // Toggle Mask for API Keys
+        document.getElementById('btnToggleGeminiMask').addEventListener('click', (e) => {
+          const input = document.getElementById('inputGeminiApiKey');
+          if (input.type === 'password') {
+            input.type = 'text';
+            e.target.textContent = '隠す';
+          } else {
+            input.type = 'password';
+            e.target.textContent = '表示';
+          }
+        });
+
+        document.getElementById('btnToggleFirebaseMask').addEventListener('click', (e) => {
+          const input = document.getElementById('inputFirebaseApiKey');
+          if (input.type === 'password') {
+            input.type = 'text';
+            e.target.textContent = '隠す';
+          } else {
+            input.type = 'password';
+            e.target.textContent = '表示';
+          }
+        });
+
+        // Settings Form Submit
+        document.getElementById('settingsForm').addEventListener('submit', (e) => {
+          e.preventDefault();
+          saveSettingsToStorage();
+          // Reset Firebase instance to re-init with new credentials
+          firebaseAppInstance = null;
+          firestoreDbInstance = null;
+          firebaseModules = null;
+          fetchAllHistory();
+        });
+
+        // Test Connection Button
+        document.getElementById('btnTestConnection').addEventListener('click', async () => {
+          saveSettingsToStorage();
+          const btn = document.getElementById('btnTestConnection');
+          btn.disabled = true;
+          btn.textContent = '接続テスト中...';
+
+          try {
+            // Test Firebase
+            let fbStatus = '未設定';
+            if (state.firebaseApiKey && state.firebaseProjectId) {
+              const fb = await getFirestoreService();
+              if (fb) {
+                const snap = await fb.getDocs(fb.collection(fb.db, 'matches'));
+                fbStatus = `接続成功 (matches: ${snap.size}件)`;
+              }
+            }
+
+            // Test Gemini API
+            let geminiStatus = '未設定';
+            if (state.geminiApiKey) {
+              const testEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(state.geminiApiKey)}`;
+              const res = await fetch(testEndpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  contents: [{ parts: [{ text: "ping" }] }]
+                })
+              });
+              if (res.ok) {
+                geminiStatus = '接続成功';
+              } else {
+                const err = await res.json().catch(() => ({}));
+                geminiStatus = `エラー (${res.status}): ${err.error?.message || ''}`;
+              }
+            }
+
+            alert(`【接続テスト結果】\n・Gemini API: ${geminiStatus}\n・Firebase Firestore: ${fbStatus}`);
+          } catch (err) {
+            alert('接続テスト中にエラーが発生しました:\n' + err.message);
+          } finally {
+            btn.disabled = false;
+            btn.textContent = '🔌 接続テスト';
+          }
+        });
+
+        // Reset Settings
+        document.getElementById('btnResetDefaultKeys').addEventListener('click', () => {
+          if (confirm('保存されているAPI設定をクリアしますか？')) {
+            localStorage.removeItem('shogi_gemini_api_key');
+            localStorage.removeItem('shogi_firebase_api_key');
+            localStorage.removeItem('shogi_firebase_project_id');
+            loadSettingsFromStorage();
+            showToast('設定をクリアしました');
+          }
+        });
+
+        // Participant Select All / Deselect All
+        document.getElementById('btnSelectAll').addEventListener('click', () => {
+          state.members.forEach(m => state.selectedMembers.add(m));
+          renderMembers();
+        });
+
+        document.getElementById('btnDeselectAll').addEventListener('click', () => {
+          state.selectedMembers.clear();
+          renderMembers();
+        });
+
+        // Add Member
+        document.getElementById('btnAddMember').addEventListener('click', () => {
+          const input = document.getElementById('newMemberNameInput');
+          const name = input.value.trim();
+          if (!name) return;
+          if (state.members.includes(name)) {
+            showToast('その名前のメンバーは既に存在します');
+            return;
+          }
+          state.members.push(name);
+          state.selectedMembers.add(name);
+          localStorage.setItem('shogi_members', JSON.stringify(state.members));
+          input.value = '';
+          renderMembers();
+          showToast(`${name} さんを追加しました`);
+        });
+
+        // Main Action Button (対戦カード作成)
+        document.getElementById('btnGeneratePairing').addEventListener('click', executePairingFlow);
+
+        // Separate Recording Button (対戦結果を記録)
+        document.getElementById('btnSaveResults').addEventListener('click', handleRecordCurrentResults);
+
+        // Recreate / Re-shuffle Pairing Button
+        document.getElementById('btnRecreatePairing').addEventListener('click', executePairingFlow);
+
+        // Refresh History Button
+        document.getElementById('btnRefreshHistory').addEventListener('click', async () => {
+          showToast('履歴を再読み込み中...');
+          await fetchAllHistory();
+          showToast('履歴を更新しました');
+        });
+
+        // Add Sample History Button
+        document.getElementById('btnAddSampleHistory').addEventListener('click', async () => {
+          const iso = new Date(Date.now() - 3600000 * 24).toISOString();
+          const sampleResult = {
+            matches: [
+              { player1: '田中', player2: '佐藤' },
+              { player1: '山田', player2: '鈴木' },
+              { player1: '高橋', player2: '伊藤' }
+            ],
+            bye: '渡辺'
+          };
+          await savePairingResults(sampleResult);
+          await fetchAllHistory();
+          showToast('テスト用の過去対局履歴を投入しました');
+        });
+
+        // History Tabs
+        const tabMatches = document.getElementById('tabBtnMatches');
+        const tabByes = document.getElementById('tabBtnByes');
+        const contentMatches = document.getElementById('tabContentMatches');
+        const contentByes = document.getElementById('tabContentByes');
+
+        tabMatches.addEventListener('click', () => {
+          tabMatches.classList.add('active');
+          tabByes.classList.remove('active');
+          contentMatches.style.display = 'block';
+          contentByes.style.display = 'none';
+        });
+
+        tabByes.addEventListener('click', () => {
+          tabByes.classList.add('active');
+          tabMatches.classList.remove('active');
+          contentByes.style.display = 'block';
+          contentMatches.style.display = 'none';
+        });
+
+        // Copy Results to Clipboard
+        document.getElementById('btnCopyResults').addEventListener('click', () => {
+          if (!state.currentResult) return;
+          const lines = [
+            `【将棋練習会 対戦カード】`,
+            `日時: ${new Date().toLocaleString('ja-JP')}`,
+            ``
+          ];
+
+          (state.currentResult.matches || []).forEach((m, i) => {
+            lines.push(`第${m.matchNumber || i + 1}対局: 先手 ☗ ${m.player1} vs 後手 ☖ ${m.player2}${m.note ? ` (${m.note})` : ''}`);
+          });
+
+          if (state.currentResult.bye && state.currentResult.bye !== 'null') {
+            lines.push(``);
+            lines.push(`抜け（お休み）: 🍵 ${state.currentResult.bye}`);
+          }
+
+          if (state.currentResult.reasoning) {
+            lines.push(``);
+            lines.push(`【決定理由】`);
+            lines.push(state.currentResult.reasoning);
+          }
+
+          navigator.clipboard.writeText(lines.join('\n')).then(() => {
+            showToast('対戦カードをクリップボードにコピーしました！');
+          }).catch(() => {
+            showToast('コピーに失敗しました');
+          });
+        });
+      }
+
+      // ==========================================
+      // Initialize Application
+      // ==========================================
+      document.addEventListener('DOMContentLoaded', async () => {
+        loadSettingsFromStorage();
+        renderMembers();
+        setupEventListeners();
+        await fetchAllHistory();
+      });
+    </script>
+  </body>
+</html>
+
+

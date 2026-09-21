@@ -1,0 +1,6 @@
+{
+  "name": "将棋練習会 自動ペアリング＆記録",
+  "description": "将棋練習会の参加者選択、Gemini APIによる過去履歴に基づく自動ペアリング、Firebase Firestoreへの結果自動保存を行えるシングルページWebアプリケーション",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
